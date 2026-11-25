@@ -101,7 +101,16 @@ def load_runs(raw_dir: Path) -> pd.DataFrame:
         data[column] = pd.to_numeric(data[column], errors="coerce")
 
     data["machine"] = data["machine"].astype(str).str.strip().str.lower()
-    data = data.dropna(subset=["machine", "nodes", "difficulty", "run_id"])
+    data = data.dropna(
+        subset=[
+            "machine",
+            "nodes",
+            "difficulty",
+            "run_id",
+            "blocks_target",
+            "blocks_confirmed",
+        ]
+    )
 
     for column in (
         "run_id",
@@ -109,16 +118,25 @@ def load_runs(raw_dir: Path) -> pd.DataFrame:
         "difficulty",
         "blocks_target",
         "blocks_confirmed",
-        "forks_detected",
-        "orphan_blocks",
     ):
         data[column] = data[column].astype(int)
+
+    for column in ("forks_detected", "orphan_blocks"):
+        data[column] = data[column].fillna(0).astype(int)
+
+    # Run dianggap timeout bila tidak mencapai blocks_target.
+    data["_is_timeout"] = data["blocks_confirmed"] < data["blocks_target"]
 
     return data
 
 
 def summarize(data: pd.DataFrame) -> pd.DataFrame:
     """Rata-rata dan standar deviasi per (machine, nodes, difficulty)."""
+    if "_is_timeout" not in data.columns:
+        data = data.assign(
+            _is_timeout=data["blocks_confirmed"] < data["blocks_target"]
+        )
+
     grouped = data.groupby(["machine", "nodes", "difficulty"], as_index=False)
 
     aggregations: dict[str, tuple[str, str]] = {}
@@ -126,6 +144,7 @@ def summarize(data: pd.DataFrame) -> pd.DataFrame:
         aggregations[f"{metric}_mean"] = (metric, "mean")
         aggregations[f"{metric}_std"] = (metric, "std")
     aggregations["runs"] = ("run_id", "count")
+    aggregations["timeouts"] = ("_is_timeout", "sum")
 
     summary = grouped.agg(**aggregations)
     summary = summary.sort_values(["machine", "nodes", "difficulty"])
@@ -133,6 +152,7 @@ def summarize(data: pd.DataFrame) -> pd.DataFrame:
 
     std_columns = [f"{metric}_std" for metric in METRICS]
     summary[std_columns] = summary[std_columns].fillna(0.0)
+    summary["timeouts"] = summary["timeouts"].astype(int)
 
     # Proksi energi: persentase CPU sistem x durasi run (CPU-detik).
     # Berguna untuk mendiskusikan konsumsi energi PoW.
@@ -149,6 +169,7 @@ def print_summary(summary: pd.DataFrame) -> None:
         "nodes",
         "difficulty",
         "runs",
+        "timeouts",
         "throughput_bps_mean",
         "avg_block_time_s_mean",
         "avg_sync_latency_ms_mean",
@@ -162,6 +183,7 @@ def print_summary(summary: pd.DataFrame) -> None:
         "node",
         "diff",
         "run",
+        "gagal",
         "throughput (blok/dtk)",
         "waktu/blok (dtk)",
         "latensi (ms)",
@@ -430,6 +452,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--no-figures", action="store_true", help="Hanya tulis ringkasan CSV."
     )
+    parser.add_argument(
+        "--exclude-timeouts",
+        action="store_true",
+        help="Keluarkan run yang tidak mencapai blocks_target dari agregasi.",
+    )
     return parser.parse_args(argv)
 
 
@@ -437,6 +464,14 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
 
     data = load_runs(Path(args.raw_dir))
+
+    if args.exclude_timeouts:
+        before = len(data)
+        data = data[~data["_is_timeout"]]
+        print(f"Mengecualikan {before - len(data)} run timeout.")
+        if data.empty:
+            raise SystemExit("Semua run timeout; tidak ada data untuk dianalisis.")
+
     summary = summarize(data)
 
     summary_path = Path(args.summary)
