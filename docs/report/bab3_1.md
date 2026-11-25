@@ -206,7 +206,7 @@ Kelompok pengujian:
 | Validasi rantai | transaksi diubah, genesis diubah, tautan diputus | Memastikan tampering terdeteksi |
 | Longest chain | lebih panjang valid diterima; lebih pendek, sama panjang, atau lebih panjang invalid ditolak | Memastikan aturan konsensus |
 
-Pengujian juga mengukur waktu mining difficulty 3 dan memberi batas longgar 5 detik agar tidak flaky pada laptop lambat. Pada mesin pengembangan, mining difficulty 3 selesai jauh di bawah 2 detik.
+Pengujian juga mengukur waktu mining difficulty 3 dan memberi batas longgar 5 detik agar tidak flaky pada laptop lambat. Pada laptop Dzikra, mining difficulty 3 selesai sekitar **0,03 detik** pada kondisi burst dan **0,07 detik** pada kondisi CPU yang sudah throttled—jauh di bawah 2 detik. Pengukuran lengkap ada di Bagian 5.9.
 
 ## 3.1.10 Keterbatasan Desain Core
 

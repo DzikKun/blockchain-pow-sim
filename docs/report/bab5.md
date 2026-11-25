@@ -2,7 +2,7 @@
 
 > **Penulis bagian ini:** Dzikra
 >
-> ⚠️ **STATUS DATA — BACA DULU.** Bab ini masih memakai **data simulasi awal (dummy)** yang dihasilkan `analysis/make_dummy.py`, bukan hasil pengukuran benchmark. Tujuannya agar struktur tabel, grafik, dan alur analisis sudah siap sebelum `bench/run_experiments.py` dari Kibar tersedia. Seluruh angka pada bab ini **wajib diganti** dengan CSV asli `results/raw/dzikra_*.csv` dan `results/raw/kibar_*.csv` sebelum laporan dikumpulkan. Kesimpulan pada Bab 6 tidak boleh diambil dari angka dummy ini.
+> ⚠️ **STATUS DATA — BACA DULU.** Tabel grid pada Bagian 5.3–5.8 masih memakai **data simulasi awal (dummy)** yang dihasilkan `analysis/make_dummy.py`, bukan hasil pengukuran benchmark. Tujuannya agar struktur tabel, grafik, dan alur analisis sudah siap sebelum `bench/run_experiments.py` dari Kibar tersedia. Seluruh angka pada tabel grid **wajib diganti** dengan CSV asli `results/raw/dzikra_*.csv` dan `results/raw/kibar_*.csv` sebelum laporan dikumpulkan. **Pengecualian:** Bagian 5.9 adalah pengukuran asli hash rate dan waktu mining di laptop Dzikra, bukan dummy. Kesimpulan pada Bab 6 tetap tidak boleh diambil dari angka grid dummy.
 
 ## 5.1 Konfigurasi Eksperimen
 
@@ -163,7 +163,55 @@ Proksi CPU-detik memberi wawasan penting. Pada difficulty 5, CPU-detik untuk 2, 
 
 Angka ini adalah proksi, bukan pengukuran watt. Untuk klaim energi yang lebih kuat diperlukan pengukuran daya listrik eksternal atau pembacaan sensor daya CPU.
 
-## 5.9 Pembahasan
+## 5.9 Pengukuran Tambahan: Hash Rate dan Throttling (Data Asli)
+
+> Bagian ini **bukan data dummy**. Pengukuran dilakukan pada 25 November 2026 di laptop Dzikra (Intel i3-N305, Windows 11, Python 3.15.2) memakai `analysis/microbench_core.py`, satu proses, tanpa proses mining lain. Charger dan power mode tidak diverifikasi ulang pada sesi ini, sehingga angka bersifat indikatif untuk mesin tersebut.
+
+### 5.9.1 Laju Hash Mentah dan Berkelanjutan
+
+| Pengukuran | Hash/detik |
+|---|---:|
+| Hash mentah jendela pendek (20.000 hash) | 121.790 |
+| Berkelanjutan jendela 1 (200.000 hash) | 112.372 |
+| Berkelanjutan jendela 2 | 76.108 |
+| Berkelanjutan jendela 3 | 52.466 |
+| Berkelanjutan jendela 4 | 52.907 |
+| Berkelanjutan jendela 5 | 52.022 |
+
+Laju hash turun sekitar **57%** dari kondisi awal ke kondisi stabil, dan bertahan di sekitar **52.000 hash/detik** setelah dua jendela. Pola ini konsisten dengan penurunan frekuensi CPU akibat beban penuh berkelanjutan (*throttling* termal/daya) pada prosesor kelas rendah daya. Implikasinya penting: benchmark dengan durasi puluhan detik tidak boleh memakai angka hash rate jendela pendek; yang relevan adalah laju stabil.
+
+### 5.9.2 Waktu Mining per Difficulty
+
+Diukur setelah CPU berada pada kondisi stabil (tiga sampel per difficulty):
+
+| d | Waktu mining (s) | Std (s) | Attempts rata-rata | Teori 16^d | Attempts/detik | Verifikasi (µs) |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 0,0004 | 0,0001 | 20 | 16 | 47.161 | 19,55 |
+| 2 | 0,0037 | 0,0047 | 160 | 256 | 44.740 | 20,11 |
+| 3 | 0,0722 | 0,0699 | 3.435 | 4.096 | 45.789 | 31,23 |
+| 4 | 0,9431 | 0,4167 | 47.156 | 65.536 | 50.298 | 19,56 |
+| 5 | 17.7495 | 9,7777 | 903.056 | 1.048.576 | 51.089 | 20,42 |
+
+Data mentah: `results/microbench/dzikra_microbench_20261125_175634.csv` dan `results/microbench/dzikra_microbench_sustained_20261125_175634.csv`.
+
+Temuan:
+
+1. **Difficulty 3 hanya sekitar 0,07 detik** pada kondisi throttled, jauh di bawah batas 2 detik yang ditargetkan. Pada kondisi burst, nilainya sekitar 0,03 detik.
+2. **Difficulty 4 memerlukan sekitar 0,94 detik**, dan **difficulty 5 sekitar 17,7 detik** untuk satu blok di satu proses. Ini menegaskan bahwa d5 adalah bottleneck utama eksperimen.
+3. **Standar deviasi d5 mencapai 55% dari rata-rata.** Nilai ini wajar karena jumlah percobaan mengikuti distribusi geometrik; satu blok bisa selesai jauh lebih cepat atau lebih lambat. Pengukuran satu blok tidak dapat diandalkan; harus dirata-ratakan.
+4. **Waktu verifikasi hanya sekitar 20 mikrodetik**, sekitar lima orde magnitudo lebih murah daripada mining d5. Ini mendukung asumsi bahwa validasi blok di jaringan bukan bottleneck; mining yang mendominasi.
+
+### 5.9.3 Implikasi untuk Benchmark Jaringan
+
+Dengan laju stabil sekitar 52.000 hash/detik per proses:
+
+- **d5 dengan 2 node:** total ~104.000 hash/detik, satu blok butuh rata-rata ~10 detik, sehingga 10 blok memerlukan sekitar **100 detik**. Ini sangat dekat dengan timeout 120 detik yang disarankan pada kontrak.
+- **d5 dengan 4 node:** sekitar 50 detik; **d5 dengan 8 node:** sekitar 25 detik.
+- Karena variansi geometrik, peluang total waktu melewati 120 detik pada d5 2 node tidak dapat diabaikan.
+
+Saran untuk runner benchmark Kibar: gunakan **timeout minimal 180 detik khusus d5**, jalankan d5 paling akhir, dan beri jeda 5–10 detik antar-run agar CPU sempat turun suhu. Tanpa itu, sebagian run d5 berisiko dicatat sebagai timeout padahal hanya lambat.
+
+## 5.10 Pembahasan
 
 Tiga temuan utama dari data simulasi awal:
 
@@ -173,23 +221,25 @@ Tiga temuan utama dari data simulasi awal:
 
 Untuk pemakaian nyata, konfigurasi yang seimbang bukan yang throughput-nya paling tinggi, melainkan yang mampu mempertahankan laju blok cukup tinggi tanpa fork berlebihan. Pada simulasi ini, difficulty 3 dengan 4 node memberi titik tengah yang menarik: throughput masih sekitar 10 blok/detik, latensi di bawah 8 ms, dan fork sekitar 1–2 per run.
 
-## 5.10 Keterbatasan dan Validitas
+## 5.11 Keterbatasan dan Validitas
 
-1. **Data masih dummy.** Seluruh angka berasal dari model `make_dummy.py`, bukan pengukuran. Bab ini belum dapat dipakai untuk menarik kesimpulan final.
+1. **Tabel grid masih dummy.** Angka pada Bagian 5.3–5.8 berasal dari model `make_dummy.py`, bukan pengukuran. Bagian 5.9 sudah asli, tetapi hanya mengukur core di satu proses, bukan jaringan multi-node.
 2. **Satu mesin, localhost.** Tidak ada latensi jaringan nyata, packet loss, atau perbedaan jam antar-mesin.
 3. **Jumlah blok per run kecil (10).** Variasi acak mining cukup besar, sehingga standar deviasi beberapa metrik mencapai 20–30% dari rata-rata.
 4. **Tiga ulangan.** Cukup untuk melihat tren, tetapi belum memadai untuk uji statistik yang kuat.
 5. **Tidak ada pengukuran daya listrik.** Pembahasan energi hanya memakai proksi CPU-detik.
 6. **Node berbagi CPU.** Penambahan node di satu laptop tidak setara dengan penambahan mesin fisik; perebutan core dan cache memengaruhi hasil.
+7. **Pengukuran microbenchmark belum dibandingkan dengan Kibar.** Angka 5.9 baru berasal dari laptop Dzikra dan belum menyertakan catatan charger/power mode.
 
-## 5.11 Rencana Pembaruan
+## 5.12 Rencana Pembaruan
 
 Setelah `bench/run_experiments.py` tersedia dan benchmark dijalankan di kedua laptop:
 
 1. Ganti `--raw-dir results/dummy` menjadi `results/raw`.
 2. Jalankan `python -m analysis.analyze --raw-dir results/raw`.
 3. Perbarui Tabel 5.1–5.4 dan Gambar 5.1–5.6 dengan angka asli.
-4. Hapus banner status data dan kalimat yang menyebut data simulasi.
+4. Hapus banner status data dan kalimat yang menyebut data simulasi **hanya untuk tabel grid**; Bagian 5.9 tetap dipertahankan sebagai pengukuran asli.
 5. Bandingkan hasil asli dengan ekspektasi teoretis pada Bab 2, lalu perbarui Bab 6 (kesimpulan) bersama Kibar.
+6. Jalankan `analysis/microbench_core.py` di laptop Kibar untuk melengkapi perbandingan hardware pada Bagian 5.9.
 
 Sampai langkah tersebut selesai, bab ini berstatus **draf metode dan kerangka analisis**, bukan hasil penelitian final.
