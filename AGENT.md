@@ -16,7 +16,7 @@
 - **Mata kuliah:** KPT (UAS), **Tema 4: Distributed Blockchain Simulation**
 - **Judul:** Analisis Pengaruh Jumlah Node dan Tingkat Kesulitan Mining terhadap Throughput Blockchain Terdistribusi
 - **Tujuan:** Membuat simulasi blockchain Proof of Work dengan beberapa node (tiap node = 1 proses OS) di satu laptop, lalu mengukur pengaruh **jumlah node** dan **difficulty** terhadap throughput, waktu blok, latensi sinkronisasi, dan jumlah fork.
-- **Mengapa judul ini:** paling ringan dan gratis, bisa dijalankan di laptop biasa, hasilnya mudah dijadikan tabel dan grafik, dan bisa membahas isu konsumsi energi PoW (makin tinggi difficulty → makin besar waktu dan CPU).
+- **Mengapa judul ini:** paling ringan dan gratis, bisa dijalankan di laptop biasa, hasilnya mudah dijadikan tabel dan grafik, dan bisa membahas isu konsumsi energi PoW (makin tinggi difficulty → makin besar waktu dan CPU)...
 
 ## 2. Anggota dan Spesifikasi Laptop
 
