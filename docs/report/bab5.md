@@ -2,7 +2,7 @@
 
 > **Penulis bagian ini:** Dzikra
 >
-> ⚠️ **STATUS DATA — BACA DULU.** Tabel grid pada Bagian 5.3–5.8 masih memakai **data simulasi awal (dummy)** yang dihasilkan `analysis/make_dummy.py`, bukan hasil pengukuran benchmark. Tujuannya agar struktur tabel, grafik, dan alur analisis sudah siap sebelum `bench/run_experiments.py` dari Kibar tersedia. Seluruh angka pada tabel grid **wajib diganti** dengan CSV asli `results/raw/dzikra_*.csv` dan `results/raw/kibar_*.csv` sebelum laporan dikumpulkan. **Pengecualian:** Bagian 5.9 adalah pengukuran asli hash rate dan waktu mining di laptop Dzikra, bukan dummy. Kesimpulan pada Bab 6 tetap tidak boleh diambil dari angka grid dummy.
+> ⚠️ **STATUS DATA — BACA DULU.** Tabel grid pada Bagian 5.3–5.8 masih memakai **data simulasi awal (dummy)** yang dihasilkan `analysis/make_dummy.py`, bukan hasil pengukuran benchmark. Tujuannya agar struktur tabel, grafik, dan alur analisis sudah siap sebelum `bench/run_experiments.py` selesai dikerjakan. Seluruh angka pada tabel grid **wajib diganti** dengan CSV asli `results/raw/dzikra_*.csv` dan `results/raw/kibar_*.csv` sebelum laporan dikumpulkan. **Pengecualian:** Bagian 5.9 adalah pengukuran asli hash rate dan waktu mining di laptop Dzikra, bukan dummy. Kesimpulan pada Bab 6 tetap tidak boleh diambil dari angka grid dummy.
 
 ## 5.1 Konfigurasi Eksperimen
 
@@ -209,7 +209,7 @@ Dengan laju stabil sekitar 52.000 hash/detik per proses:
 - **d5 dengan 4 node:** sekitar 50 detik; **d5 dengan 8 node:** sekitar 25 detik.
 - Karena variansi geometrik, peluang total waktu melewati 120 detik pada d5 2 node tidak dapat diabaikan.
 
-Saran untuk runner benchmark Kibar: gunakan **timeout minimal 180 detik khusus d5**, jalankan d5 paling akhir, dan beri jeda 5–10 detik antar-run agar CPU sempat turun suhu. Tanpa itu, sebagian run d5 berisiko dicatat sebagai timeout padahal hanya lambat.
+Saran untuk runner benchmark: gunakan **timeout minimal 180 detik khusus d5**, jalankan d5 paling akhir, dan beri jeda 5–10 detik antar-run agar CPU sempat turun suhu. Tanpa itu, sebagian run d5 berisiko dicatat sebagai timeout padahal hanya lambat.
 
 ## 5.10 Pembahasan
 
