@@ -7,3 +7,9 @@ venv/
 
 # Data simulasi awal (dummy) tidak ikut di-commit
 results/dummy/
+
+# Log mentah per node dari benchmark (besar, bisa dibuat ulang)
+results/raw/logs/
+
+# Uji coba runner memakai node palsu
+results/smoke/
