@@ -68,13 +68,13 @@ Pada implementasi simulasi, `should_stop` dicek setiap 1000 percobaan. Pemeriksa
 
 ## 2.6 Konsensus Longest Chain, Fork, dan Blok Orphan
 
-Ketika beberapa node mining secara bersamaan, dua node dapat menemukan blok berbeda pada ketinggian yang sama. Jaringan kemudian memiliki dua versi rantai. Aturan konsensus yang dipakai adalah **longest chain**: rantai dengan jumlah blok terbanyak dan valid dianggap pemenang. Node yang menerima rantai lebih panjang akan mengganti rantainya.
+Ketika beberapa node mining secara bersamaan, dua node dapat menemukan blok berbeda pada ketinggian yang sama. Jaringan kemudian memiliki dua versi rantai. Aturan konsensus yang dipakai adalah **longest chain**: rantai dengan jumlah blok terbanyak dan valid dianggap pemenang. Node yang menerima rantai lebih panjang akan mengganti rantainya. Jika panjangnya sama, dipakai tie-break deterministik: hash blok terakhir yang lebih kecil menang.
 
 Blok yang pernah ditambang tetapi tidak masuk ke rantai final disebut **blok orphan**. Fork dan orphan adalah biaya alami dari desentralisasi: semakin banyak penambang yang bersaing dan semakin pendek interval blok, semakin besar peluang dua blok lahir hampir bersamaan. Sebaliknya, difficulty tinggi memperpanjang interval blok sehingga peluang tabrakan mengecil.
 
-Pada simulasi ini, fork dideteksi ketika node menerima `NEW_BLOCK` yang tidak menyambung ke rantai lokal (index melompat atau `prev_hash` berbeda). Node lalu mengirim `GET_CHAIN` ke pengirim dan mencoba mengganti rantainya dengan rantai yang lebih panjang. Peristiwa ini dicatat sebagai `fork_detected` dan `chain_replaced` pada log JSONL.
+Pada simulasi ini, fork dideteksi ketika node menerima `NEW_BLOCK` yang tidak menyambung ke rantai lokal (index melompat atau `prev_hash` berbeda). Node lalu mengirim `GET_CHAIN` ke pengirim dan mencoba mengganti rantainya dengan rantai yang lebih panjang, atau rantai sama panjang dengan hash blok terakhir lebih kecil. Peristiwa ini dicatat sebagai `fork_detected` dan `chain_replaced` pada log JSONL.
 
-Perlu dicatat bahwa aturan longest chain sederhana memiliki kelemahan: dua rantai dengan panjang sama tidak memiliki tie-breaker eksplisit. Pada simulasi, rantai yang datang lebih dulu dipertahankan sampai ada rantai yang benar-benar lebih panjang. Untuk skala eksperimen ini, pendekatan tersebut cukup karena tujuannya adalah mengamati penyelesaian fork, bukan membangun konsensus produksi.
+Perlu dicatat bahwa aturan *longest chain* saja memiliki kelemahan: dua rantai dengan panjang sama dapat bertahan di node berbeda. Pada simulasi ini hal itu diselesaikan dengan **tie-break deterministik**: jika panjangnya sama, rantai dengan hash blok terakhir lebih kecil secara leksikografis yang dipilih. Aturan ini dipakai karena deterministik dan mudah diverifikasi, bukan karena meniru Bitcoin yang memakai akumulasi kerja. Selain tie-break, node diberi grace period singkat setelah target tercapai agar rantai saingan di ketinggian yang sama sempat dipertukarkan sebelum proses berhenti.
 
 ## 2.7 Jaringan, Broadcast, dan Latensi Sinkronisasi
 

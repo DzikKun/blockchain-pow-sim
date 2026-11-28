@@ -125,9 +125,15 @@ class Blockchain:
     def new_block(self, transactions: list[dict]) -> Block: ...   # belum di-mine, prev_hash = last_block.hash
     def add_block(self, block: Block) -> bool: ...                 # cek index, prev_hash, hash, PoW -> append
     def is_valid_chain(self, chain: list[Block]) -> bool: ...
-    def replace_chain(self, new_chain: list[Block]) -> bool: ...   # hanya jika lebih panjang DAN valid
+    def replace_chain(self, new_chain: list[Block]) -> bool: ...   # lebih panjang, atau sama panjang dengan hash terakhir lebih kecil; DAN valid
     def to_list(self) -> list[dict]: ...
 ```
+
+**Aturan tie-break (PC-001).** `replace_chain` menerima rantai yang lebih panjang;
+jika panjangnya sama, rantai dengan **hash blok terakhir lebih kecil secara
+leksikografis** yang menang. Aturan ini deterministik sehingga dua node yang
+menambang blok berbeda pada ketinggian sama tetap memilih rantai yang sama.
+Perubahan ini tercatat di `docs/CONTRACT_CHANGES.md`.
 
 ### 6.4 Protokol jaringan
 Transport TCP localhost. 1 pesan = 1 baris JSON diakhiri `\n`. Node ke-`i` listen di port `5000 + i`.
@@ -245,11 +251,11 @@ Semua run: **3 ulangan**, charger tercolok, Windows power mode "Best performance
 **D3. `core/chain.py`**
 - [ ] Genesis block **deterministik** (misal `timestamp=0`, nonce tetap) agar identik di semua node
 - [ ] `new_block`, `add_block` (cek index berurutan, `prev_hash`, hash benar, PoW valid)
-- [ ] `is_valid_chain`, `replace_chain` (ganti hanya jika lebih panjang DAN valid), `to_list()`
+- [ ] `is_valid_chain`, `replace_chain` (ganti jika lebih panjang DAN valid; jika sama panjang, hash terakhir lebih kecil menang), `to_list()`
 - *Selesai jika:* chain yang dimanipulasi (ubah 1 transaksi) ditolak oleh `is_valid_chain`
 
 **D4. `tests/test_core.py`**
-- [ ] Test: hash deterministik, mining valid, tampering terdeteksi, `replace_chain` hanya menerima yang lebih panjang dan valid, serialisasi bolak-balik
+- [ ] Test: hash deterministik, mining valid, tampering terdeteksi, `replace_chain` menerima rantai lebih panjang dan tie-break hash terkecil, serialisasi bolak-balik
 - [ ] `pytest tests/test_core.py` hijau
 
 > **Begitu D1-D3 jalan minimal: PR, merge ke `main`, kabari Kibar.** Jangan tunggu sempurna. Rapikan di PR berikutnya.
@@ -358,10 +364,11 @@ Semua run: **3 ulangan**, charger tercolok, Windows power mode "Best performance
 - [ ] Blok berhasil → `add_block` lokal → broadcast `NEW_BLOCK` (isi `sent_at = time.time()`)
 - [ ] Terima `NEW_BLOCK` valid dan menyambung → `add_block`, hentikan mining sekarang, mulai blok berikutnya
 - [ ] Berhenti saat chain lokal mencapai `blocks_target` blok (di luar genesis)
+- [ ] **Wajib:** setelah target tercapai, beri **grace period 1 detik** sambil terus mengirim `GET_CHAIN` tiap ±0,2 detik. Tanpa ini, blok saingan di ketinggian yang sama tidak pernah dipertukarkan dan rantai akhir 4 node berbeda. Prototipe dengan jeda 1 detik menghasilkan rantai identik 3/3 run.
 
 **K3. Sinkronisasi dan Fork**
 - [ ] `NEW_BLOCK` yang tidak menyambung (index lompat atau `prev_hash` beda) → kirim `GET_CHAIN` ke pengirim
-- [ ] Terima `CHAIN` → `replace_chain` (longest valid chain)
+- [ ] Terima `CHAIN` → `replace_chain` (rantai lebih panjang menang; jika sama panjang, hash blok terakhir lebih kecil menang — PC-001)
 - [ ] Catat event `fork_detected` dan `chain_replaced`
 - [ ] Node yang tertinggal bisa sync lewat `GET_CHAIN` saat start
 
@@ -375,6 +382,7 @@ Semua run: **3 ulangan**, charger tercolok, Windows power mode "Best performance
 
 **K6. `tests/test_node.py`**
 - [ ] 2 node, difficulty 1, 3 blok → chain akhir identik
+- [ ] **4 node, difficulty 3, 10 blok, 3 ulangan → semua `chain.to_list()` identik** (jalankan lewat subprocess agar race tertangkap)
 - [ ] Node tertinggal bisa sync via `GET_CHAIN`
 - [ ] Blok invalid (hash dirusak) ditolak
 

@@ -18,7 +18,7 @@ from core import Block, Blockchain, mine, is_valid_pow, create_genesis_block
 | Menambahkan blok lokal / dari peer | `chain.add_block(block) -> bool` |
 | Mengubah dict jaringan menjadi blok | `Block.from_dict(data)` |
 | Mengubah rantai menjadi list dict | `chain.to_list()` |
-| Mengganti rantai dengan yang lebih panjang | `chain.replace_chain(list_of_blocks) -> bool` |
+| Mengganti rantai dengan yang lebih panjang (atau tie-break hash terkecil) | `chain.replace_chain(list_of_blocks) -> bool` |
 | Menvalidasi PoW blok | `is_valid_pow(block, difficulty)` |
 
 ## 2. Alur Mining di Node
@@ -97,7 +97,7 @@ if self.chain.replace_chain(new_chain):
     })
 ```
 
-Syarat `replace_chain`: rantai baru harus **benar-benar lebih panjang** dan valid secara penuh (genesis + tautan + hash + PoW). Rantai sama panjang akan ditolak.
+Syarat `replace_chain`: rantai baru harus valid secara penuh (genesis + tautan + hash + PoW) dan **lebih panjang** dari rantai lokal. Jika panjangnya **sama**, rantai dengan hash blok terakhir **lebih kecil secara leksikografis** yang diterima (tie-break PC-001); rantai sama panjang dengan hash lebih besar ditolak.
 
 ## 5. Invarian Genesis
 
@@ -121,7 +121,7 @@ Genesis dibuat otomatis oleh `Blockchain.__init__`, dengan `timestamp=0`, `nonce
 4. **Menambang blok baru saat rantai lokal belum sinkron** → setelah `chain_replaced`, mulai lagi dari `chain.new_block`.
 5. **Transaksi berisi tipe non-JSON** (misalnya `set`, `datetime`) → hash akan gagal. Gunakan dict/list/str/int/float/bool/None.
 6. **Mengharapkan `mine` berhenti seketika** → callback hanya dicek tiap 1000 percobaan.
-7. **Menganggap rantai sama panjang sebagai pemenang** → aturan proyek: hanya rantai lebih panjang yang menggantikan.
+7. **Mengabaikan tie-break rantai sama panjang** → aturan proyek: rantai lebih panjang menang; jika sama panjang, hash blok terakhir lebih kecil yang menang (PC-001). Tanpa tie-break, dua node dapat saling bertukar rantai atau berhenti pada rantai berbeda.
 
 ## 7. Kontrak Pesan yang Sudah Disepakati
 

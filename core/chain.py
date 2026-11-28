@@ -97,8 +97,17 @@ class Blockchain:
         return True
 
     def replace_chain(self, new_chain: list[Block]) -> bool:
-        """Ganti chain hanya jika lebih panjang **dan** valid (longest chain)."""
-        if len(new_chain) <= len(self.chain):
+        """Ganti chain bila lebih panjang, atau sama panjang dengan hash terakhir lebih kecil.
+
+        Aturan tie-break (PC-001, lihat ``docs/CONTRACT_CHANGES.md``) membuat
+        dua node yang menambang blok berbeda pada ketinggian sama tetap memilih
+        rantai yang sama tanpa saling bertukar terus-menerus.
+        """
+        if len(new_chain) < len(self.chain):
+            return False
+        if len(new_chain) == len(self.chain) and (
+            new_chain[-1].hash >= self.chain[-1].hash
+        ):
             return False
         if not self.is_valid_chain(new_chain):
             return False
