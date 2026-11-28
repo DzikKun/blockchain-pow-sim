@@ -37,6 +37,24 @@ def build_chain(difficulty: int, n_blocks: int) -> Blockchain:
     return chain
 
 
+def build_tagged_chain(difficulty: int, timestamps: list[float]) -> Blockchain:
+    """Bangun chain dengan timestamp tetap agar hash-nya deterministik.
+
+    Dipakai untuk menguji tie-break rantai sama panjang (PC-001).
+    """
+    chain = Blockchain(difficulty)
+    for i, timestamp in enumerate(timestamps):
+        block = Block(
+            index=i + 1,
+            timestamp=timestamp,
+            transactions=[{"n": i}],
+            prev_hash=chain.last_block.hash,
+            nonce=0,
+        )
+        assert chain.add_block(mine_block(block, difficulty))
+    return chain
+
+
 # ---------------------------------------------------------------- Block
 
 
@@ -266,12 +284,25 @@ def test_replace_chain_rejects_shorter_chain():
     assert len(longer.chain) == 4
 
 
-def test_replace_chain_rejects_equal_length_chain():
-    chain_a = build_chain(difficulty=2, n_blocks=2)
-    chain_b = build_chain(difficulty=2, n_blocks=2)
+def test_replace_chain_accepts_equal_length_with_smaller_last_hash():
+    winner = build_tagged_chain(2, [1700000000.0, 1700000100.0])
+    loser = build_tagged_chain(2, [1700000100.0, 1700000200.0])
 
-    # Chain lain tetap lebih panjang? Tidak. Harus ditolak.
-    assert chain_a.replace_chain(chain_b.chain) is False
+    # Penjaga urutan: hash terakhir `winner` harus lebih kecil dari `loser`.
+    assert winner.last_block.hash < loser.last_block.hash
+
+    assert loser.replace_chain(winner.chain) is True
+    assert loser.to_list() == winner.to_list()
+
+
+def test_replace_chain_rejects_equal_length_with_larger_last_hash():
+    winner = build_tagged_chain(2, [1700000000.0, 1700000100.0])
+    loser = build_tagged_chain(2, [1700000100.0, 1700000200.0])
+
+    assert winner.last_block.hash < loser.last_block.hash
+
+    assert winner.replace_chain(loser.chain) is False
+    assert winner.to_list() != loser.to_list()
 
 
 def test_replace_chain_rejects_invalid_longer_chain():

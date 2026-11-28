@@ -11,7 +11,7 @@ Core blockchain dipisahkan menjadi tiga modul dengan tanggung jawab tunggal agar
 core/
 ├── block.py   # struktur blok, hashing, serialisasi
 ├── pow.py     # algoritma mining dan verifikasi Proof of Work
-└── chain.py   # genesis, penambahan blok, validasi rantai, longest chain
+└── chain.py   # genesis, penambahan blok, validasi rantai, longest chain + tie-break
 ```
 
 Lapisan jaringan (`node/`) hanya berinteraksi melalui antarmuka publik yang ditetapkan pada kontrak proyek. Pemisahan ini memungkinkan core diuji tanpa membuka socket, dan memungkinkan node memakai mock selama core belum tersedia.
@@ -138,10 +138,14 @@ Jika salah satu gagal, method mengembalikan `False` dan rantai tidak berubah. Pe
    - hash konsisten dengan isi,
    - PoW valid pada difficulty rantai.
 
-`replace_chain(new_chain)` hanya mengganti rantai jika **lebih panjang secara ketat** dan valid:
+`replace_chain(new_chain)` mengganti rantai jika rantai baru valid dan **lebih panjang**, atau **sama panjang dengan hash blok terakhir lebih kecil**:
 
 ```python
-if len(new_chain) <= len(self.chain):
+if len(new_chain) < len(self.chain):
+    return False
+if len(new_chain) == len(self.chain) and (
+    new_chain[-1].hash >= self.chain[-1].hash
+):
     return False
 if not self.is_valid_chain(new_chain):
     return False
@@ -149,7 +153,7 @@ self.chain = list(new_chain)
 return True
 ```
 
-Aturan “lebih panjang secara ketat” mencegah penggantian rantai dengan panjang sama yang dapat menyebabkan dua node saling bertukar rantai tanpa akhir. Rantai dengan panjang sama dipertahankan apa adanya sampai ada rantai yang benar-benar lebih panjang. Ini adalah penyederhanaan yang disepakati dan bukan bagian dari kontrak yang perlu diubah.
+Aturan *longest chain* saja tidak cukup pada simulasi paralel: dua node dapat menambang blok berbeda pada ketinggian yang sama, sehingga rantai tetap sama panjang. Tanpa tie-break, kedua node mempertahankan rantai masing-masing dan demo tidak pernah konvergen. Karena itu ditambahkan tie-break deterministik **PC-001**: jika panjangnya sama, rantai dengan hash blok terakhir lebih kecil secara leksikografis yang dipilih. Perbandingan string hex 64 karakter identik dengan perbandingan numerik dan hasilnya sama di semua node. Detail usulan ada di `docs/CONTRACT_CHANGES.md`.
 
 ## 3.1.7 Kompleksitas
 
@@ -190,7 +194,7 @@ Pengujian memakai `pytest` dan mencakup kontrak, determinisme, keamanan validasi
 
 ```
 $ python -m pytest tests/test_core.py -q
-29 passed in 0.23s
+30 passed in 0.82s
 ```
 
 Kelompok pengujian:
@@ -204,7 +208,7 @@ Kelompok pengujian:
 | Genesis | identik untuk difficulty 1, 3, 5 | Memastikan konsensus titik awal |
 | Penambahan blok | index salah, `prev_hash` salah, PoW invalid, objek bukan `Block` | Memastikan rantai tidak bisa dirusak |
 | Validasi rantai | transaksi diubah, genesis diubah, tautan diputus | Memastikan tampering terdeteksi |
-| Longest chain | lebih panjang valid diterima; lebih pendek, sama panjang, atau lebih panjang invalid ditolak | Memastikan aturan konsensus |
+| Longest chain + tie-break | lebih panjang valid diterima; sama panjang dengan hash terakhir lebih kecil diterima; lebih pendek, sama panjang dengan hash lebih besar, atau lebih panjang invalid ditolak | Memastikan konsensus deterministik |
 
 Pengujian juga mengukur waktu mining difficulty 3 dan memberi batas longgar 5 detik agar tidak flaky pada laptop lambat. Pada laptop Dzikra, mining difficulty 3 selesai sekitar **0,03 detik** pada kondisi burst dan **0,07 detik** pada kondisi CPU yang sudah throttled—jauh di bawah 2 detik. Pengukuran lengkap ada di Bagian 5.9.
 
@@ -213,7 +217,7 @@ Pengujian juga mengukur waktu mining difficulty 3 dan memberi batas longgar 5 de
 1. **Difficulty bersifat tetap per instance `Blockchain`.** Tidak ada penyesuaian difficulty otomatis seperti pada Bitcoin. Ini disengaja agar variabel eksperimen terkontrol.
 2. **Tidak ada tanda tangan digital.** Validitas transaksi tidak diperiksa; fokus penelitian adalah PoW dan sinkronisasi.
 3. **Tidak ada mempool dan aturan biaya.** Transaksi hanya daftar dict yang ditempelkan ke blok.
-4. **Longest chain tanpa tie-breaker eksplisit.** Rantai sama panjang dipertahankan sampai ada yang lebih panjang.
+4. **Longest chain dengan tie-break hash.** Rantai sama panjang diselesaikan dengan memilih hash blok terakhir yang lebih kecil. Aturan ini deterministik, tetapi bukan aturan Bitcoin (Bitcoin memakai akumulasi kerja, bukan panjang saja).
 5. **Timestamp memakai jam node.** Pada simulasi satu mesin, seluruh node berbagi jam yang sama. Pada jaringan nyata, skew jam perlu ditangani.
 6. **Genesis tidak memakai PoW.** Keputusan ini memudahkan konsensus lintas difficulty, tetapi berarti genesis tidak memiliki bukti kerja.
 
